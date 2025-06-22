@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Прогресс времени</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .container {
+            text-align: center;
+            width: 90%;
+            max-width: 600px;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            font-weight: 300;
+            opacity: 0;
+            transform: translateY(20px);
+            animation: fadeIn 1s ease-out 0.3s forwards;
+        }
+
+        .buttons {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 1.5rem;
+            opacity: 0;
+            transform: translateY(20px);
+            animation: fadeIn 1s ease-out 0.6s forwards;
+        }
+
+        .time-btn {
+            padding: 8px 16px;
+            background-color: #e0e0e0;
+            border: none;
+            border-radius: 20px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .time-btn:hover {
+            background-color: #d0d0d0;
+        }
+
+        .time-btn.active {
+            color: white;
+        }
+
+        /* Градиенты для разных режимов */
+        .day-mode .progress-bar,
+        .day-mode .time-btn.active {
+            background: linear-gradient(90deg, #ff5e62 0%, #ff9966 100%);
+        }
+
+        .month-mode .progress-bar,
+        .month-mode .time-btn.active {
+            background: linear-gradient(90deg, #11998e 0%, #38ef7d 100%);
+        }
+
+        .year-mode .progress-bar,
+        .year-mode .time-btn.active {
+            background: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%);
+        }
+
+        .progress-container {
+            width: 100%;
+            height: 20px;
+            background-color: #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            opacity: 0;
+            transform: translateY(20px);
+            animation: fadeIn 1s ease-out 0.9s forwards;
+        }
+
+        .progress-bar {
+            height: 100%;
+            width: 0;
+            border-radius: 10px;
+            transition: width 1.5s ease-out;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .progress-bar::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg,
+                    rgba(255, 255, 255, 0) 0%,
+                    rgba(255, 255, 255, 0.3) 50%,
+                    rgba(255, 255, 255, 0) 100%);
+            animation: shimmer 2s infinite;
+        }
+
+        .percentage {
+            font-size: 4rem;
+            font-weight: 100;
+            margin-bottom: 1rem;
+            color: #4facfe;
+            opacity: 0;
+            transform: translateY(20px);
+            animation: fadeIn 1s ease-out 1.2s forwards;
+        }
+
+        /* Цвета процентов для разных режимов */
+        .day-mode .percentage {
+            color: #ff5e62;
+        }
+
+        .month-mode .percentage {
+            color: #11998e;
+        }
+
+        .year-mode .percentage {
+            color: #4facfe;
+        }
+
+        .details {
+            font-size: 1.2rem;
+            line-height: 1.6;
+            opacity: 0;
+            transform: translateY(20px);
+            animation: fadeIn 1s ease-out 1.5s forwards;
+        }
+
+        @keyframes fadeIn {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes shimmer {
+            0% {
+                transform: translateX(-100%);
+            }
+
+            100% {
+                transform: translateX(100%);
+            }
+        }
+
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: #f00;
+            opacity: 0;
+        }
+    </style>
+</head>
+
+<body class="year-mode"> <!-- По умолчанию годовой режим -->
+    <div class="container">
+        <h1 id="title">Прогресс года</h1>
+        <div class="buttons">
+            <button class="time-btn" id="day-btn">День</button>
+            <button class="time-btn" id="month-btn">Месяц</button>
+            <button class="time-btn active" id="year-btn">Год</button>
+        </div>
+        <div class="percentage" id="percentage">0%</div>
+        <div class="progress-container">
+            <div class="progress-bar" id="progress-bar"></div>
+        </div>
+        <div class="details" id="details"></div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // Получаем элементы DOM
+            const dayBtn = document.getElementById('day-btn');
+            const monthBtn = document.getElementById('month-btn');
+            const yearBtn = document.getElementById('year-btn');
+            const title = document.getElementById('title');
+            const progressBar = document.getElementById('progress-bar');
+            const percentageElement = document.getElementById('percentage');
+            const detailsElement = document.getElementById('details');
+            const body = document.body;
+
+            let currentMode = 'year'; // По умолчанию выбран год
+            let updateInterval;
+            let lastPercentage = 0; // Для отслеживания достижения 100%
+
+            // Инициализация при загрузке страницы
+            updateProgress();
+            startUpdating();
+
+            // Обработчики кликов по кнопкам
+            dayBtn.addEventListener('click', function () {
+                setActiveMode('day');
+            });
+
+            monthBtn.addEventListener('click', function () {
+                setActiveMode('month');
+            });
+
+            yearBtn.addEventListener('click', function () {
+                setActiveMode('year');
+            });
+
+            // Функция установки активного режима (день/месяц/год)
+            function setActiveMode(mode) {
+                currentMode = mode;
+
+                // Обновляем активную кнопку
+                dayBtn.classList.remove('active');
+                monthBtn.classList.remove('active');
+                yearBtn.classList.remove('active');
+
+                // Устанавливаем соответствующий класс для body (для цветовой схемы)
+                body.classList.remove('day-mode', 'month-mode', 'year-mode');
+                body.classList.add(mode + '-mode');
+
+                // Обновляем заголовок
+                if (mode === 'day') {
+                    dayBtn.classList.add('active');
+                    title.textContent = 'Прогресс дня';
+                } else if (mode === 'month') {
+                    monthBtn.classList.add('active');
+                    title.textContent = 'Прогресс месяца';
+                } else {
+                    yearBtn.classList.add('active');
+                    title.textContent = 'Прогресс года';
+                }
+
+                // Перезапускаем обновление
+                clearInterval(updateInterval);
+                updateProgress();
+                startUpdating();
+            }
+
+            // Основная функция обновления прогресса
+            function updateProgress() {
+                const now = new Date();
+                let percentage, details;
+                let isComplete = false; // Флаг достижения 100%
+
+                if (currentMode === 'day') {
+                    // Расчет прогресса для дня
+                    const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                    const dayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+                    const dayDuration = dayEnd - dayStart;
+                    const elapsedTime = now - dayStart;
+                    percentage = (elapsedTime / dayDuration) * 100;
+
+                    // Детали для дня
+                    const hours = now.getHours();
+                    const minutes = now.getMinutes();
+                    const seconds = now.getSeconds();
+                    const remainingHours = 23 - hours;
+                    const remainingMinutes = 59 - minutes;
+                    const remainingSeconds = 59 - seconds;
+
+                    details = `
+                        <p>Текущее время: ${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}</p>
+                        <p>Осталось: ${remainingHours} ч ${remainingMinutes} мин ${remainingSeconds} сек</p>
+                    `;
+                } else if (currentMode === 'month') {
+                    // Расчет прогресса для месяца
+                    const year = now.getFullYear();
+                    const month = now.getMonth();
+                    const monthStart = new Date(year, month, 1);
+                    const monthEnd = new Date(year, month + 1, 1);
+                    const monthDuration = monthEnd - monthStart;
+                    const elapsedTime = now - monthStart;
+                    percentage = (elapsedTime / monthDuration) * 100;
+
+                    // Детали для месяца
+                    const daysInMonth = (monthEnd - monthStart) / (1000 * 60 * 60 * 24);
+                    const elapsedDays = Math.floor(elapsedTime / (1000 * 60 * 60 * 24));
+                    const remainingDays = Math.floor(daysInMonth - elapsedDays);
+
+                    const monthNames = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+                        'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+
+                    details = `
+                        <p>${monthNames[month]} ${year}</p>
+                        <p>Прошло дней: ${elapsedDays}</p>
+                        <p>Осталось дней: ${remainingDays}</p>
+                    `;
+                } else {
+                    // Расчет прогресса для года (по умолчанию)
+                    const year = now.getFullYear();
+                    const yearStart = new Date(year, 0, 1);
+                    const yearEnd = new Date(year + 1, 0, 1);
+                    const yearDuration = yearEnd - yearStart;
+                    const elapsedTime = now - yearStart;
+                    percentage = (elapsedTime / yearDuration) * 100;
+
+                    // Детали для года
+                    const daysInYear = (year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)) ? 366 : 365;
+                    const elapsedDays = Math.floor(elapsedTime / (1000 * 60 * 60 * 24));
+                    const remainingDays = daysInYear - elapsedDays;
+
+                    details = `
+                        <p>${year} год</p>
+                        <p>Прошло дней: ${elapsedDays}</p>
+                        <p>Осталось дней: ${remainingDays}</p>
+                    `;
+                }
+
+                // Проверяем, достигли ли мы 100%
+                if (percentage >= 99.999 && lastPercentage < 100) {
+                    isComplete = true;
+                }
+                lastPercentage = percentage;
+
+                percentage = Math.min(100, Math.max(0, percentage)); // Ограничиваем от 0 до 100
+
+                // Обновляем прогресс бар
+                progressBar.style.width = `${percentage}%`;
+
+                // Анимация чисел
+                let start = parseFloat(percentageElement.textContent) || 0;
+                const end = parseFloat(percentage.toFixed(6));
+                const duration = 1000;
+                const startTime = performance.now();
+
+                function updatePercentage(currentTime) {
+                    const elapsed = currentTime - startTime;
+                    const progress = Math.min(elapsed / duration, 1);
+                    const value = start + (end - start) * progress;
+
+                    percentageElement.textContent = `${value.toFixed(6)}%`;
+
+                    if (progress < 1) {
+                        requestAnimationFrame(updatePercentage);
+                    } else {
+                        // Когда анимация завершена, показываем детали
+                        detailsElement.innerHTML = details;
+
+                        // Если прогресс завершен (100%), запускаем конфетти
+                        if (isComplete) {
+                            celebrate();
+                        }
+                    }
+                }
+
+                requestAnimationFrame(updatePercentage);
+            }
+
+            // Функция запуска периодического обновления
+            function startUpdating() {
+                // Обновляем прогресс каждую секунду
+                updateInterval = setInterval(updateProgress, 1000);
+            }
+
+            // Функция запуска анимации конфетти
+            function celebrate() {
+                // Создаем 100 конфетти
+                for (let i = 0; i < 100; i++) {
+                    createConfetti();
+                }
+            }
+
+            // Функция создания одного элемента конфетти
+            function createConfetti() {
+                const colors = ['#4facfe', '#00f2fe', '#ff9a9e', '#fad0c4', '#a18cd1', '#fbc2eb',
+                    '#ff5e62', '#ff9966', '#11998e', '#38ef7d'];
+                const confetti = document.createElement('div');
+                confetti.className = 'confetti';
+
+                // Случайный цвет
+                const color = colors[Math.floor(Math.random() * colors.length)];
+                confetti.style.backgroundColor = color;
+
+                // Случайная позиция
+                const x = Math.random() * window.innerWidth;
+                const y = -10;
+                confetti.style.left = `${x}px`;
+                confetti.style.top = `${y}px`;
+
+                // Случайный размер
+                const size = Math.random() * 10 + 5;
+                confetti.style.width = `${size}px`;
+                confetti.style.height = `${size}px`;
+
+                // Случайная форма
+                confetti.style.borderRadius = Math.random() > 0.5 ? '50%' : '0';
+
+                document.body.appendChild(confetti);
+
+                // Анимация падения
+                const animationDuration = Math.random() * 3000 + 2000;
+                const rotation = Math.random() * 360;
+
+                confetti.style.transition = `all ${animationDuration}ms ease-out`;
+                confetti.style.opacity = '1';
+
+                setTimeout(() => {
+                    confetti.style.transform = `translateY(${window.innerHeight + 20}px) rotate(${rotation}deg)`;
+                    confetti.style.opacity = '0';
+
+                    // Удаляем конфетти после анимации
+                    setTimeout(() => {
+                        confetti.remove();
+                    }, animationDuration);
+                }, 10);
+            }
+        });
+    </script>
+</body>
+
+</html>
